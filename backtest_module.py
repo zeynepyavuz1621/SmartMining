@@ -83,10 +83,3 @@ def compute_metrics(returns: pd.Series, rf: float = 0.0) -> dict:
     }
 
 
-def train_test_split_dates(dates: pd.DatetimeIndex,
-                           train_ratio: float = 0.7) -> tuple:
-    """Split an index into train and test portions."""
-    split_idx   = int(len(dates) * train_ratio)
-    train_dates = dates[:split_idx]
-    test_dates  = dates[split_idx:]
-    return train_dates, test_dates

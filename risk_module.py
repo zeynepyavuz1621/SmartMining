@@ -1,16 +1,15 @@
 """
 Risk Control Module — Smart Mining Project
-Implements Stop-Loss rule at the portfolio level.
+Stop-Loss rule: when an asset hits its drawdown limit, its weight
+flows into CASH (not redistributed to other metals).
 
-Stop-Loss logic:
-  - Track a "high-water mark" for each asset.
-  - If an asset's price drops more than `stop_loss_pct` from its rolling peak,
-    set its weight to 0 and redistribute to other assets pro-rata.
-  - A "cooldown" period prevents re-entry for `cooldown_days` after a stop-loss trigger.
+This means the portfolio can go partially or fully to cash during
+stress periods.
 """
 
 import pandas as pd
 import numpy as np
+from portfolio_module import CASH
 
 
 def apply_stop_loss(prices: pd.DataFrame,
@@ -20,53 +19,64 @@ def apply_stop_loss(prices: pd.DataFrame,
     """
     Apply a stop-loss rule to portfolio weights.
 
+    When an asset's price drops more than `stop_loss_pct` from its
+    20-day rolling peak, its weight is set to 0 and moved to CASH.
+    The asset then enters a cooldown period.
+
     Parameters
     ----------
-    prices        : daily price DataFrame
-    weights       : daily weight DataFrame (output of portfolio_module)
-    stop_loss_pct : maximum allowed drawdown from rolling peak before exit (e.g. 0.10 = 10%)
-    cooldown_days : number of days an asset is excluded after stop-loss triggers
+    prices        : daily price DataFrame (metal tickers only, no CASH)
+    weights       : daily weight DataFrame including CASH column
+    stop_loss_pct : max allowed drawdown from 20-day peak (e.g. 0.10 = 10%)
+    cooldown_days : days the asset stays out after stop-loss triggers
 
     Returns
     -------
-    adjusted_weights : weight DataFrame with stop-loss applied
+    adjusted weights DataFrame
     """
-    tickers   = weights.columns.tolist()
-    adj_w     = weights.copy()
-    cooldowns = {t: 0 for t in tickers}  # days remaining in cooldown
+    metal_tickers = [c for c in weights.columns if c != CASH]
+    adj_w         = weights.copy()
+    cooldowns     = {t: 0 for t in metal_tickers}
 
     for i in range(1, len(weights)):
-        date       = weights.index[i]
-        prev_date  = weights.index[i - 1]
-        row        = adj_w.loc[date].copy()
+        date = weights.index[i]
+        row  = adj_w.loc[date].copy()
 
-        for t in tickers:
-            # Decrement cooldown counter
+        freed_weight = 0.0   # weight released by stop-losses this day
+
+        for t in metal_tickers:
+            # Count down cooldown
             if cooldowns[t] > 0:
                 cooldowns[t] -= 1
+                freed_weight += row[t]
                 row[t] = 0.0
                 continue
 
             if t not in prices.columns:
                 continue
 
-            # Check drawdown from peak over past 20 days
+            # Rolling 20-day peak
             window  = prices[t].iloc[max(0, i - 20): i + 1]
             peak    = window.max()
-            current = prices[t].loc[date] if date in prices.index else peak
-
-            drawdown = (current - peak) / peak  # negative number
+            if date not in prices.index:
+                continue
+            current  = prices.loc[date, t]
+            drawdown = (current - peak) / peak   # negative number
 
             if drawdown < -stop_loss_pct:
+                freed_weight  += row[t]
                 row[t]         = 0.0
                 cooldowns[t]   = cooldown_days
 
-        # Re-normalise remaining weights
+        # Move freed weight to CASH
+        row[CASH] = row.get(CASH, 0.0) + freed_weight
+
+        # Normalise to ensure sum = 1 (handles floating-point drift)
         total = row.sum()
         if total > 1e-8:
             row = row / total
         else:
-            row = pd.Series(1.0 / len(tickers), index=tickers)
+            row[CASH] = 1.0
 
         adj_w.loc[date] = row
 
@@ -74,10 +84,6 @@ def apply_stop_loss(prices: pd.DataFrame,
 
 
 def compute_portfolio_drawdown(cum_returns: pd.Series) -> pd.Series:
-    """
-    Compute rolling drawdown series from a cumulative return series.
-    Drawdown = (current value - rolling max) / rolling max
-    """
+    """Drawdown = (current - rolling max) / rolling max"""
     rolling_max = cum_returns.cummax()
-    drawdown    = (cum_returns - rolling_max) / rolling_max
-    return drawdown
+    return (cum_returns - rolling_max) / rolling_max
