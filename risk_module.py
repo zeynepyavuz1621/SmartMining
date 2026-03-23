@@ -68,8 +68,13 @@ def apply_stop_loss(prices: pd.DataFrame,
                 row[t]         = 0.0
                 cooldowns[t]   = cooldown_days
 
-        # Move freed weight to CASH
-        row[CASH] = row.get(CASH, 0.0) + freed_weight
+        # freed weight → mevcut ağırlıklara orantılı dağıt
+        remaining = row.drop(index=[t for t in metal_tickers if cooldowns[t] > 0])
+        other_total = remaining.sum()
+        if other_total > 1e-8:
+            row[remaining.index] += freed_weight * (remaining / other_total)
+        else:
+            row[CASH] += freed_weight
 
         # Normalise to ensure sum = 1 (handles floating-point drift)
         total = row.sum()
