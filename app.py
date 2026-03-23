@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
+import zipfile, io
 from datetime import date
 
 from data_module      import download_prices, compute_returns, get_data_summary, ASSETS
@@ -77,8 +78,6 @@ h3 { font-family: 'IBM Plex Sans', sans-serif !important; font-weight: 600 !impo
     border-radius: 6px !important;
     padding: 0.5rem 2rem !important;
 }
-
-/* Reset button — subtle grey style */
 div[data-testid="stButton"]:has(button[kind="secondary"]) button {
     background: #21262d !important;
     color: #8b949e !important;
@@ -86,7 +85,6 @@ div[data-testid="stButton"]:has(button[kind="secondary"]) button {
     padding: 0.3rem 1rem !important;
     border: 1px solid #30363d !important;
 }
-
 .stSelectbox label, .stSlider label, .stDateInput label, .stMultiSelect label {
     color: #8b949e !important;
     font-family: 'IBM Plex Mono', monospace !important;
@@ -99,20 +97,6 @@ hr { border-color: #21262d !important; }
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Session state init + reset logic
-# ─────────────────────────────────────────────────────────────────────────────
-def init_defaults():
-    for k, v in DEFAULTS.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
-
-def reset_defaults():
-    for k, v in DEFAULTS.items():
-        st.session_state[k] = v
-
-init_defaults()
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Shared plot base
 # ─────────────────────────────────────────────────────────────────────────────
 DARK_BG = dict(
@@ -122,12 +106,34 @@ DARK_BG = dict(
     legend=dict(bgcolor="#161b22", bordercolor="#30363d"),
     xaxis=dict(gridcolor="#21262d"),
 )
-
 PALETTE = [
     "#e6a817", "#58a6ff", "#3fb950", "#f85149", "#d2a8ff",
     "#ffa657", "#79c0ff", "#56d364", "#ff7b72", "#bc8cff",
 ]
 CASH_COLOR = "#444c56"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Session state init
+# ─────────────────────────────────────────────────────────────────────────────
+def init_defaults():
+    for k, v in DEFAULTS.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+    # checkbox defaults
+    for k, v in [("dl_metrics", True), ("dl_cumret", True), ("dl_weights", True),
+                 ("dl_signals", False), ("dl_zscores", False)]:
+        if k not in st.session_state:
+            st.session_state[k] = v
+    # backtest results
+    if "results" not in st.session_state:
+        st.session_state["results"] = None
+
+def reset_defaults():
+    for k, v in DEFAULTS.items():
+        st.session_state[k] = v
+    st.session_state["results"] = None  # clear cached results on reset
+
+init_defaults()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Sidebar
@@ -168,11 +174,7 @@ with st.sidebar:
     cooldown_days = st.slider("Cooldown After Stop-Loss (days)", 1, 20, key="cooldown_days")
 
     st.markdown("---")
-
-    # Reset button
     st.button("↺ Reset to Defaults", on_click=reset_defaults, use_container_width=True, type="secondary")
-
-    # Run button
     run_btn = st.button("▶ RUN BACKTEST", use_container_width=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -185,85 +187,123 @@ st.markdown("---")
 # ─────────────────────────────────────────────────────────────────────────────
 # Landing
 # ─────────────────────────────────────────────────────────────────────────────
-if not run_btn:
+if not run_btn and st.session_state["results"] is None:
     st.info("👈  Configure parameters in the sidebar and press **RUN BACKTEST** to start.")
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown("#### 📡 Signal")
-        st.markdown(f"Mean reversion via **rolling z-score**. Threshold fixed at **±{Z_THRESHOLD}** (90% confidence interval). When price is statistically too high, we sell. When too low, we buy.")
+        st.markdown(f"Mean reversion via **rolling z-score**. Threshold fixed at **±{Z_THRESHOLD}** (90% CI). When price is statistically too high, we sell. When too low, we buy.")
     with c2:
         st.markdown("#### 📊 Portfolio")
         st.markdown("**Markowitz optimiser** with **Cash** as an explicit asset. If nothing looks attractive, the strategy moves to cash.")
     with c3:
         st.markdown("#### 🛡️ Risk")
-        st.markdown("**Stop-loss**: if an asset drops beyond the threshold from its 20-day peak, its weight flows to **Cash** until the cooldown expires.")
+        st.markdown("**Stop-loss**: if an asset drops beyond the threshold from its 20-day peak, its weight flows to other assets or cash.")
     st.stop()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Validation
+# Run backtest only when button is pressed
 # ─────────────────────────────────────────────────────────────────────────────
-if len(selected_tickers) < 1:
-    st.error("Please select at least 1 asset.")
+if run_btn:
+    if len(selected_tickers) < 1:
+        st.error("Please select at least 1 asset.")
+        st.stop()
+    if start_date >= end_date:
+        st.error("Start date must be before end date.")
+        st.stop()
+
+    _lookback      = st.session_state["lookback"]
+    _est_window    = st.session_state["est_window"]
+    _rebal_freq    = st.session_state["rebal_freq"]
+    _risk_aversion = st.session_state["risk_aversion"]
+    _stop_loss_pct = st.session_state["stop_loss_pct"] / 100
+    _cooldown_days = st.session_state["cooldown_days"]
+
+    with st.spinner("📡 Downloading price data from Yahoo Finance…"):
+        prices = download_prices(selected_tickers, str(start_date), str(end_date))
+
+    if prices.empty or len(prices) < _est_window + 30:
+        st.error("Not enough data. Try a wider date range or different assets.")
+        st.stop()
+
+    available = [t for t in selected_tickers if t in prices.columns]
+    prices    = prices[available]
+    returns   = compute_returns(prices)
+
+    with st.spinner("⚙️ Computing signals…"):
+        signals = generate_signals(prices, lookback=_lookback)
+        zscores = compute_signal_strength(prices, lookback=_lookback)
+
+    with st.spinner("📐 Building portfolio (with Cash option)…"):
+        weights_raw = build_portfolio(returns, signals,
+                                      estimation_window=_est_window,
+                                      rebalance_freq=_rebal_freq,
+                                      risk_aversion=_risk_aversion)
+
+    with st.spinner("🛡️ Applying stop-loss…"):
+        weights = apply_stop_loss(prices, weights_raw,
+                                  stop_loss_pct=_stop_loss_pct,
+                                  cooldown_days=_cooldown_days)
+
+    with st.spinner("📊 Running backtest…"):
+        prices_for_bt       = prices.copy()
+        prices_for_bt[CASH] = 1.0
+        port_returns        = run_backtest(prices_for_bt, weights)
+        bmark_returns       = equal_weight_benchmark(prices)
+        common              = port_returns.index.intersection(bmark_returns.index)
+        port_returns        = port_returns.loc[common]
+        bmark_returns       = bmark_returns.loc[common]
+        port_metrics        = compute_metrics(port_returns)
+        bmark_metrics       = compute_metrics(bmark_returns)
+
+    # ── Cache all results in session_state ──────────────────────────────────
+    st.session_state["results"] = {
+        "prices":        prices,
+        "returns":       returns,
+        "signals":       signals,
+        "zscores":       zscores,
+        "weights":       weights,
+        "port_returns":  port_returns,
+        "bmark_returns": bmark_returns,
+        "port_metrics":  port_metrics,
+        "bmark_metrics": bmark_metrics,
+        "available":     available,
+        # save params for export readme
+        "params": {
+            "start_date":    str(start_date),
+            "end_date":      str(end_date),
+            "assets":        ", ".join(available),
+            "lookback":      _lookback,
+            "z_threshold":   Z_THRESHOLD,
+            "est_window":    _est_window,
+            "rebal_freq":    _rebal_freq,
+            "risk_aversion": _risk_aversion,
+            "stop_loss_pct": int(_stop_loss_pct * 100),
+            "cooldown_days": _cooldown_days,
+        }
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Load from cache
+# ─────────────────────────────────────────────────────────────────────────────
+if st.session_state["results"] is None:
     st.stop()
-if start_date >= end_date:
-    st.error("Start date must be before end date.")
-    st.stop()
 
-# Read values from session state
-_lookback       = st.session_state["lookback"]
-_est_window     = st.session_state["est_window"]
-_rebal_freq     = st.session_state["rebal_freq"]
-_risk_aversion  = st.session_state["risk_aversion"]
-_stop_loss_pct  = st.session_state["stop_loss_pct"] / 100
-_cooldown_days  = st.session_state["cooldown_days"]
+R             = st.session_state["results"]
+prices        = R["prices"]
+returns       = R["returns"]
+signals       = R["signals"]
+zscores       = R["zscores"]
+weights       = R["weights"]
+port_returns  = R["port_returns"]
+bmark_returns = R["bmark_returns"]
+port_metrics  = R["port_metrics"]
+bmark_metrics = R["bmark_metrics"]
+available     = R["available"]
+params        = R["params"]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Data
-# ─────────────────────────────────────────────────────────────────────────────
-with st.spinner("📡 Downloading price data from Yahoo Finance…"):
-    prices = download_prices(selected_tickers, str(start_date), str(end_date))
-
-if prices.empty or len(prices) < _est_window + 30:
-    st.error("Not enough data. Try a wider date range or different assets.")
-    st.stop()
-
-available = [t for t in selected_tickers if t in prices.columns]
-prices    = prices[available]
-returns   = compute_returns(prices)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Pipeline
-# ─────────────────────────────────────────────────────────────────────────────
-with st.spinner("⚙️ Computing signals…"):
-    signals = generate_signals(prices, lookback=_lookback)
-    zscores = compute_signal_strength(prices, lookback=_lookback)
-
-with st.spinner("📐 Building portfolio (with Cash option)…"):
-    weights_raw = build_portfolio(returns, signals,
-                                  estimation_window=_est_window,
-                                  rebalance_freq=_rebal_freq,
-                                  risk_aversion=_risk_aversion)
-
-with st.spinner("🛡️ Applying stop-loss…"):
-    weights = apply_stop_loss(prices, weights_raw,
-                              stop_loss_pct=_stop_loss_pct,
-                              cooldown_days=_cooldown_days)
-
-with st.spinner("📊 Running backtest…"):
-    prices_for_bt        = prices.copy()
-    prices_for_bt[CASH]  = 1.0
-
-    port_returns  = run_backtest(prices_for_bt, weights)
-    bmark_returns = equal_weight_benchmark(prices)
-
-    common        = port_returns.index.intersection(bmark_returns.index)
-    port_returns  = port_returns.loc[common]
-    bmark_returns = bmark_returns.loc[common]
-    port_metrics  = compute_metrics(port_returns)
-    bmark_metrics = compute_metrics(bmark_returns)
-
-metal_cols   = [c for c in weights.columns if c != CASH]
-cash_weight  = weights[CASH] if CASH in weights.columns else pd.Series(0.0, index=weights.index)
+metal_cols  = [c for c in weights.columns if c != CASH]
+cash_weight = weights[CASH] if CASH in weights.columns else pd.Series(0.0, index=weights.index)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Tabs
@@ -279,7 +319,6 @@ with tab1:
     st.markdown("## Performance Overview")
 
     avg_cash = float(cash_weight.mean() * 100)
-
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Total Return",
               f"{port_metrics['Total Return (%)']:.1f}%",
@@ -326,7 +365,7 @@ with tab1:
 # ══════════════════════════════════════════════════
 with tab2:
     st.markdown("## Mean Reversion Signals")
-    st.caption(f"Lookback: **{_lookback} days** · Z-score threshold: **±{Z_THRESHOLD}** (90% CI)")
+    st.caption(f"Lookback: **{params['lookback']} days** · Z-score threshold: **±{Z_THRESHOLD}** (90% CI)")
 
     ticker_sel = st.selectbox("Select asset to inspect:", available,
                               format_func=lambda x: f"{x} — {ASSETS.get(x, x)}")
@@ -518,11 +557,77 @@ with tab5:
                            font=dict(color="#c9d1d9", family="IBM Plex Mono"), height=400)
     st.plotly_chart(fig_corr, use_container_width=True)
 
+    # ── Export ──────────────────────────────────────────────────────────────
     st.markdown("### Export Data")
-    col_d1, col_d2 = st.columns(2)
-    with col_d1:
-        st.download_button("⬇ Download Prices CSV",
-                           prices.to_csv().encode("utf-8"), "prices.csv", "text/csv")
-    with col_d2:
-        st.download_button("⬇ Download Weights CSV",
-                           weights.to_csv().encode("utf-8"), "weights.csv", "text/csv")
+    st.caption("Select files to include in the ZIP, then download.")
+
+    col_e1, col_e2, col_e3, col_e4, col_e5 = st.columns(5)
+    with col_e1:
+        st.checkbox("📊 Metrics",            key="dl_metrics")
+    with col_e2:
+        st.checkbox("📈 Cumulative Returns",  key="dl_cumret")
+    with col_e3:
+        st.checkbox("⚖️ Weights",            key="dl_weights")
+    with col_e4:
+        st.checkbox("🎯 Signals",            key="dl_signals")
+    with col_e5:
+        st.checkbox("🔢 Z-Scores",           key="dl_zscores")
+
+    # Build ZIP in memory (always ready, no button needed to re-run backtest)
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+
+        if st.session_state["dl_metrics"]:
+            zf.writestr("metrics.csv",
+                        pd.DataFrame({"Strategy": port_metrics,
+                                      "Benchmark": bmark_metrics}).to_csv())
+
+        if st.session_state["dl_cumret"]:
+            zf.writestr("cumulative_returns.csv",
+                        pd.DataFrame({
+                            "Strategy":  (1 + port_returns).cumprod(),
+                            "Benchmark": (1 + bmark_returns).cumprod(),
+                        }).to_csv())
+
+        if st.session_state["dl_weights"]:
+            zf.writestr("weights.csv", weights.to_csv())
+
+        if st.session_state["dl_signals"]:
+            zf.writestr("signals.csv", signals.to_csv())
+
+        if st.session_state["dl_zscores"]:
+            zf.writestr("zscores.csv", zscores.to_csv())
+
+        # always include prices + params
+        zf.writestr("prices.csv", prices.to_csv())
+        param_lines = [
+            "Smart Mining — Backtest Export",
+            "================================",
+            f"Start Date:        {params['start_date']}",
+            f"End Date:          {params['end_date']}",
+            f"Assets:            {params['assets']}",
+            f"Lookback:          {params['lookback']} days",
+            f"Z-Score Threshold: {params['z_threshold']} (90% CI, fixed)",
+            f"Estimation Window: {params['est_window']} days",
+            f"Rebalance Every:   {params['rebal_freq']} days",
+            f"Risk Aversion λ:   {params['risk_aversion']}",
+            f"Stop-Loss:         {params['stop_loss_pct']}%",
+            f"Cooldown:          {params['cooldown_days']} days",
+        ]
+        zf.writestr("parameters.txt", "\n".join(param_lines))
+
+    zip_buffer.seek(0)
+
+    any_selected = any(st.session_state[k] for k in
+                       ["dl_metrics", "dl_cumret", "dl_weights", "dl_signals", "dl_zscores"])
+
+    if any_selected:
+        st.download_button(
+            label="⬇ Download Selected Files as ZIP",
+            data=zip_buffer,
+            file_name="smart_mining_export.zip",
+            mime="application/zip",
+            use_container_width=True,
+        )
+    else:
+        st.warning("Please select at least one file to download.")
