@@ -1,0 +1,40 @@
+Smart Mining Grid Search - portfolio_2024
+Donem,2024-01-01,2024-12-31
+Varliklar,CPER, LIT, SLV, PPLT, PALL, GLD
+Toplam kombinasyon,405
+Z-Score threshold (sabit),1.645
+
+BENCHMARK (1/N Equal-Weight)
+Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio
+0.224,2.51,4.72,20.58,-14.61,0.323
+
+Best Sharpe Ratio (yuksek iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%),avg_weight_CPER,avg_weight_LIT,avg_weight_SLV,avg_weight_PPLT,avg_weight_PALL,avg_weight_GLD,avg_weight_CASH
+1,Best Sharpe Ratio,10.0,60.0,1.0,3.5,5%,10.0,1.509,27.73,29.92,17.36,-8.14,3.676,29.51
+2,Best Sharpe Ratio,30.0,60.0,1.0,3.5,5%,10.0,1.457,26.58,28.74,17.34,-8.14,3.531,29.95
+3,Best Sharpe Ratio,20.0,60.0,21.0,1.0,5%,10.0,1.412,21.25,22.73,14.51,-11.22,2.025,34.0
+
+Best Total Return (yuksek iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%),avg_weight_CPER,avg_weight_LIT,avg_weight_SLV,avg_weight_PPLT,avg_weight_PALL,avg_weight_GLD,avg_weight_CASH
+1,Best Total Return,10.0,60.0,1.0,3.5,5%,10.0,1.509,27.73,29.92,17.36,-8.14,3.676,29.51
+2,Best Total Return,30.0,60.0,1.0,3.5,5%,10.0,1.457,26.58,28.74,17.34,-8.14,3.531,29.95
+3,Best Total Return,20.0,60.0,1.0,3.5,5%,10.0,1.33,23.99,26.1,17.44,-9.74,2.681,29.54
+
+Min Max Drawdown (dusuk iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%),avg_weight_CPER,avg_weight_LIT,avg_weight_SLV,avg_weight_PPLT,avg_weight_PALL,avg_weight_GLD,avg_weight_CASH
+1,Min Max Drawdown,30.0,60.0,21.0,0.5,10%,5.0,-0.848,-18.82,-16.97,21.93,-34.62,-0.49,16.8
+2,Min Max Drawdown,20.0,60.0,21.0,0.5,10%,5.0,-0.848,-18.82,-16.97,21.93,-34.62,-0.49,16.8
+3,Min Max Drawdown,10.0,60.0,21.0,0.5,10%,5.0,-0.848,-18.82,-16.97,21.93,-34.62,-0.49,16.8
+
+Best Calmar Ratio (yuksek iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%),avg_weight_CPER,avg_weight_LIT,avg_weight_SLV,avg_weight_PPLT,avg_weight_PALL,avg_weight_GLD,avg_weight_CASH
+1,Best Calmar Ratio,10.0,60.0,1.0,3.5,5%,10.0,1.509,27.73,29.92,17.36,-8.14,3.676,29.51
+2,Best Calmar Ratio,30.0,60.0,1.0,3.5,5%,10.0,1.457,26.58,28.74,17.34,-8.14,3.531,29.95
+3,Best Calmar Ratio,20.0,30.0,1.0,3.5,5%,5.0,0.953,19.51,22.39,21.21,-7.75,2.888,46.28
+
+Min Volatility (dusuk iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%),avg_weight_CPER,avg_weight_LIT,avg_weight_SLV,avg_weight_PPLT,avg_weight_PALL,avg_weight_GLD,avg_weight_CASH
+1,Min Volatility,10.0,30.0,21.0,0.5,5%,10.0,-0.51,-7.85,-6.97,14.17,-14.22,-0.49,76.4
+2,Min Volatility,10.0,30.0,21.0,1.0,5%,10.0,-0.51,-7.85,-6.97,14.17,-14.22,-0.49,76.4
+3,Min Volatility,20.0,30.0,21.0,1.0,5%,10.0,-0.51,-7.85,-6.97,14.17,-14.22,-0.49,76.4
+

@@ -1,0 +1,40 @@
+Smart Mining Grid Search - pall_5y
+Donem,2021-01-04,2025-12-31
+Varliklar,PALL
+Toplam kombinasyon,405
+Z-Score threshold (sabit),1.645
+
+BENCHMARK (1/N Equal-Weight)
+Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio
+-0.005,-34.28,-0.2,40.53,-73.63,-0.003
+
+Best Sharpe Ratio (yuksek iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%)
+1,Best Sharpe Ratio,30.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+2,Best Sharpe Ratio,20.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+3,Best Sharpe Ratio,10.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+
+Best Total Return (yuksek iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%)
+1,Best Total Return,30.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+2,Best Total Return,10.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+3,Best Total Return,20.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+
+Min Max Drawdown (dusuk iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%)
+1,Min Max Drawdown,20.0,30.0,1.0,1.0,20%,1.0,-0.048,-22.03,-1.29,27.12,-69.02,-0.019,62.76
+2,Min Max Drawdown,20.0,30.0,1.0,1.0,20%,10.0,-0.045,-21.7,-1.21,27.11,-68.89,-0.017,62.81
+3,Min Max Drawdown,20.0,30.0,1.0,1.0,20%,5.0,-0.042,-21.37,-1.12,27.11,-68.76,-0.016,62.78
+
+Best Calmar Ratio (yuksek iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%)
+1,Best Calmar Ratio,30.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+2,Best Calmar Ratio,20.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+3,Best Calmar Ratio,10.0,60.0,21.0,0.5,10%,10.0,0.821,124.06,20.77,22.99,-25.13,0.826,73.82
+
+Min Volatility (dusuk iyi)
+Rank,Criteria (sort),lookback,est_window,rebal_freq,risk_aversion,stop_loss_pct,cooldown_days,Sharpe Ratio,Total Return (%),Ann. Return (%),Ann. Volatility (%),Max Drawdown (%),Calmar Ratio,Avg Cash (%)
+1,Min Volatility,20.0,60.0,21.0,3.5,5%,10.0,0.74,63.36,11.59,14.81,-14.27,0.812,89.57
+2,Min Volatility,30.0,60.0,21.0,3.5,5%,10.0,0.74,63.36,11.59,14.81,-14.27,0.812,89.57
+3,Min Volatility,10.0,60.0,21.0,3.5,5%,10.0,0.74,63.49,11.61,14.84,-14.49,0.801,89.54
+

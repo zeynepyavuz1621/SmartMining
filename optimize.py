@@ -60,6 +60,12 @@ def run_combination(prices, returns, params):
         metrics         = compute_metrics(port_returns)
         cash_col        = weights[CASH] if CASH in weights.columns else pd.Series(0.0, index=weights.index)
         metrics["Avg Cash (%)"] = round(float(cash_col.mean() * 100), 2)
+
+        # Her varligin ortalama agirligini ekle
+        for col in weights.columns:
+            col_name = f"avg_weight_{col}" if col != CASH else "avg_weight_CASH"
+            metrics[col_name] = round(float(weights[col].mean() * 100), 2)
+
         return {**params, **metrics}
     except Exception:
         return None
@@ -173,7 +179,8 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path  = f"results/{label}_top3_{timestamp}.csv"
 
-    all_cols = ["Rank", "Criteria (sort)"] + PARAM_COLS + METRIC_COLS
+    weight_cols = [c for c in df.columns if c.startswith("avg_weight_")]
+    all_cols = ["Rank", "Criteria (sort)"] + PARAM_COLS + METRIC_COLS + weight_cols
 
     with open(out_path, "w", encoding="utf-8") as f:
         # Bilgi blogu

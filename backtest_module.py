@@ -22,7 +22,7 @@ def run_backtest(prices: pd.DataFrame,
 
     Returns daily portfolio return series.
     """
-    daily_returns = prices.pct_change().dropna()
+    daily_returns = prices.pct_change(fill_method=None).dropna()
 
     # Align
     common_dates   = daily_returns.index.intersection(weights.index)

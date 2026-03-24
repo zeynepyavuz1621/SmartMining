@@ -36,9 +36,15 @@ def download_prices(tickers: list[str], start: str, end: str) -> pd.DataFrame:
     prices = prices.dropna(axis=1, how="all")
 
     # Forward-fill gaps (weekends, holidays), then back-fill leading NaNs
-    prices = prices.ffill().bfill()
+    prices = prices.ffill(limit=5).bfill(limit=5)
 
-    return prices
+    # Son geçerli tarihten sonra tamamen veri yoksa o sütunu o noktada kes
+    for col in prices.columns:
+        last_valid = prices[col].last_valid_index()
+        if last_valid is not None and last_valid < prices.index[-1]:
+            prices.loc[last_valid:, col] = np.nan
+
+        return prices
 
 
 def compute_returns(prices: pd.DataFrame) -> pd.DataFrame:
