@@ -28,7 +28,7 @@ DEFAULTS = {
     "start_date":     date(2021, 1, 4),
     "end_date":       date(2025, 12, 31),
     "lookback":       20,
-    "est_window":     60,
+    "est_window":     40,
     "rebal_freq":     5,
     "risk_aversion":  1.0,
     "stop_loss_pct":  10,
@@ -161,11 +161,11 @@ with st.sidebar:
     )
 
     st.markdown("### 🎛️ Signal Parameters")
-    lookback = st.slider("Mean Reversion Lookback (days)", 5, 60, key="lookback", step=5)
+    lookback = st.slider("Mean Reversion Lookback (days)", 5, 40, key="lookback", step=5)
     st.caption(f"Z-score threshold fixed at **±{Z_THRESHOLD}** (90% confidence interval)")
 
     st.markdown("### 📐 Portfolio Parameters")
-    est_window    = st.slider("Estimation Window (days)", 20, 120, key="est_window",    step=10)
+    est_window    = st.slider("Estimation Window (days)", 20, 60, key="est_window",    step=10)
     rebal_freq    = st.slider("Rebalance Every (days)",    1,  21, key="rebal_freq",    step=1)
     risk_aversion = st.slider("Risk Aversion (λ)",       0.1, 5.0, key="risk_aversion", step=0.1)
 

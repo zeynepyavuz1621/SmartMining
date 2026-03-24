@@ -30,7 +30,7 @@ def run_backtest(prices: pd.DataFrame,
     weights_lagged = weights.shift(1).loc[common_dates].fillna(0)
 
     # Clip stale NaN rows in weights
-    weights_lagged = weights_lagged.fillna(method="ffill").fillna(0)
+    weights_lagged = weights_lagged.ffill().fillna(0)
 
     # Portfolio return = sum(w_i * r_i)
     port_returns = (weights_lagged * daily_returns).sum(axis=1)
