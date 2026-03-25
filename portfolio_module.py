@@ -25,14 +25,19 @@ def add_cash(returns: pd.DataFrame) -> pd.DataFrame:
 
 
 def estimate_inputs(returns: pd.DataFrame, window: int):
-    """
-    Rolling mean (μ) and covariance (Σ), annualised.
-    CASH column is included; its μ=0 and covariance with everything = 0.
-    """
     slice_ = returns.iloc[-window:]
+    
+    # Son satırda NaN olan sütunları düşür — o gün aktif olmayan varlıklar
+    last_row = slice_.iloc[-1]
+    active_cols = last_row.dropna().index.tolist()
+    slice_ = slice_[active_cols]
+    
+    # Kalan NaN'ları da temizle
+    slice_ = slice_.dropna()
+    
     mu  = slice_.mean().values * 252
-    cov = slice_.cov().values   * 252
-    return mu, cov
+    cov = slice_.cov().values  * 252
+    return mu, cov, slice_.columns.tolist()
 
 
 def signal_adjusted_mu(mu: np.ndarray, signals: np.ndarray,
@@ -51,7 +56,8 @@ def signal_adjusted_mu(mu: np.ndarray, signals: np.ndarray,
 
 
 def markowitz_weights(mu: np.ndarray, cov: np.ndarray,
-                      risk_aversion: float = 1.0) -> np.ndarray:
+                      risk_aversion: float = 1.0,
+                      active_tickers: list = None) -> np.ndarray:
     """
     Maximise:  μ'w - (λ/2) w'Σw
     Subject to: sum(w) = 1,  0 ≤ w ≤ 1
@@ -75,9 +81,12 @@ def markowitz_weights(mu: np.ndarray, cov: np.ndarray,
         w /= w.sum()
         return w
     else:
-        # fallback: put everything in CASH
+        # Fallback: put everything in CASH if available, otherwise equal weight
         w = np.zeros(n)
-        w[-1] = 1.0   # CASH is always last column
+        if active_tickers and CASH in active_tickers:
+            w[active_tickers.index(CASH)] = 1.0
+        else:
+            w = np.ones(n) / n
         return w
 
 
@@ -88,12 +97,13 @@ def build_portfolio(returns: pd.DataFrame,
                     risk_aversion: float = 1.0) -> pd.DataFrame:
     """
     Rolling portfolio construction with CASH as an explicit asset.
+    Delisted assets (NaN columns) are automatically excluded from
+    the optimisation on each rebalance date.
 
     Returns a weight DataFrame whose columns are the original tickers + CASH.
     """
     returns_with_cash = add_cash(returns)
-    all_tickers       = returns_with_cash.columns.tolist()   # metals + CASH
-    n                 = len(all_tickers)
+    all_tickers       = returns_with_cash.columns.tolist()
     dates             = returns_with_cash.index
 
     weight_records = {}
@@ -105,19 +115,26 @@ def build_portfolio(returns: pd.DataFrame,
         date      = dates[i]
         ret_slice = returns_with_cash.iloc[i - estimation_window: i]
 
-        # Signal vector (CASH gets 0)
-        sig_today = np.zeros(n)
+        # Estimate inputs — NaN columns dropped inside
+        mu, cov, active_tickers = estimate_inputs(ret_slice, estimation_window)
+
+        # Signal vector for active tickers only
+        sig_today = np.zeros(len(active_tickers))
         if date in signals.index:
-            for j, t in enumerate(all_tickers):
+            for j, t in enumerate(active_tickers):
                 if t in signals.columns:
                     sig_today[j] = signals.loc[date, t]
 
-        mu, cov   = estimate_inputs(ret_slice, estimation_window)
-        mu_adj    = signal_adjusted_mu(mu, sig_today, all_tickers)
-        cov_reg   = cov + np.eye(n) * 1e-6
+        mu_adj  = signal_adjusted_mu(mu, sig_today, active_tickers)
+        cov_reg = cov + np.eye(len(active_tickers)) * 1e-6
+        weights_active = markowitz_weights(mu_adj, cov_reg, risk_aversion, active_tickers)
 
-        weights   = markowitz_weights(mu_adj, cov_reg, risk_aversion)
-        weight_records[date] = dict(zip(all_tickers, weights))
+        # Map active weights back to full ticker list — inactive assets get 0
+        full_weights = {t: 0.0 for t in all_tickers}
+        for t, w in zip(active_tickers, weights_active):
+            full_weights[t] = w
+
+        weight_records[date] = full_weights
 
     weights_df = pd.DataFrame(weight_records).T
     weights_df = weights_df.reindex(dates).ffill().bfill()

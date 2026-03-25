@@ -44,12 +44,11 @@ def download_prices(tickers: list[str], start: str, end: str) -> pd.DataFrame:
         if last_valid is not None and last_valid < prices.index[-1]:
             prices.loc[last_valid:, col] = np.nan
 
-        return prices
+    return prices
 
 
 def compute_returns(prices: pd.DataFrame) -> pd.DataFrame:
-    """Compute daily log returns."""
-    return np.log(prices / prices.shift(1)).dropna()
+    return np.log(prices / prices.shift(1)).dropna(how="all")
 
 
 def get_data_summary(prices: pd.DataFrame) -> dict:
